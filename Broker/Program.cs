@@ -30,20 +30,14 @@ namespace DClark.MQTT.Broker
     {
         static void Main(string[] args)
         {
-            int workerThreads;
-            int completionPortThreads;
             Server server = new Server(new SessionProvider(), new StorageProvider());
             Console.CancelKeyPress += delegate(object sender, ConsoleCancelEventArgs eventArgs)
             {
                 if (eventArgs.SpecialKey == ConsoleSpecialKey.ControlC) {
                     server.Stop();
                     eventArgs.Cancel = true;
-
-                    ThreadPool.GetAvailableThreads(out workerThreads, out completionPortThreads);
-                    Console.WriteLine("Avail Thread: {0} worker, {1} I/O", workerThreads, completionPortThreads);
                 }
             };
-//            ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
             server.Run();
         }
     }
