@@ -111,16 +111,20 @@ namespace DClark.MQTT
 
         private async void handleConnection(TcpClient connection)
         {
+            var ep = connection.Client.RemoteEndPoint;
+            Console.WriteLine("New Conection from {0}", ep);
             NetworkStream stream = connection.GetStream();
             MqttMessage message = await MqttMessage.Read(stream, 5);
             if (message.Type != MessageType.Connect) throw new MqttProtocolException("First packet not connect");
             //TODO: Non-clean sessions
             ConnAckMessage connAck = new ConnAckMessage(0, false);
             await connAck.Write(stream);
+            ConnectMessage connectMessage = (ConnectMessage) message;
             double keepalive = ((ConnectMessage)message).KeepAlive*1.5;
             String clientId = ((ConnectMessage)message).ClientId;
             //Console.WriteLine("Client {0} connected", clientId);
             IMqttSession session = await sessionProvider.NewSession(clientId);
+            Console.WriteLine("Client {0} connected from {1} ({2},{3})", clientId, ep,connectMessage.CleanSession,connectMessage.KeepAlive);
             connections.Add(session, connection);
             Task<MqttMessage> incoming = MqttMessage.Read(stream);
             Task<PendingMessage> outgoing = session.NextPending(null,0);
@@ -152,6 +156,7 @@ namespace DClark.MQTT
                         switch (message.Type)
                         {
                             case MessageType.Publish:
+                                Console.WriteLine("Publish received from {0} ({1})", clientId, message);
                                 await PublishReceived(session, stream, (PublishMessage)message);
                                 break;
                             case MessageType.Disconnect:

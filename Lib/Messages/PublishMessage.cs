@@ -34,6 +34,11 @@ namespace DClark.MQTT.Messages
 
         private byte[] payload;
 
+        public override string ToString()
+        {
+            return String.Format("{0},{1},{2},{3},{4},{5}", PacketId, QoS, Duplicate, Retain, Topic, payload == null ? RemainingSize : payload.Length);
+        }
+
         public byte[] Payload
         {
             get
