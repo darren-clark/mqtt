@@ -57,18 +57,14 @@ namespace DClark.MQTT
 
         public static async Task<TResult> Delay<TResult>(int delayMilliseconds, TResult result)
         {
-            //Console.WriteLine("Delaying {0} millis before returing {1}", delayMilliseconds, result);
             await Task.Delay(delayMilliseconds);
-            //Console.WriteLine("Returing {0}", result);
             return result;
         }
 
         public static async Task<TResult> Delay<TResult>(int delayMilliseconds, Func<TResult> func)
         {
-            //Console.WriteLine("Delaying {0} millis before executing {1}", delayMilliseconds, func);
             await Task.Delay(delayMilliseconds);
             TResult result = func();
-            //Console.WriteLine("Returning {0}", result);
             return result;
         }
 

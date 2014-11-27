@@ -39,7 +39,6 @@ namespace DClark.MQTT.SimpleProvider
 
         Task IMqttSessionProvider.CloseSession(IMqttSession session)
         {
-            //Console.WriteLine("Clossing session {0}", session.ClientId);
             //TODO: Clean up subscriptions if cleansession
             return Util.CompletedTask;
         }
@@ -104,7 +103,6 @@ namespace DClark.MQTT.SimpleProvider
         {
             List<QoS> result = new List<QoS>();
             foreach(KeyValuePair<string,QoS> subscription in subscriptions){
-                //Console.WriteLine("{0} subscribed to {1} with QoS {2}", session.ClientId, subscription.Key, subscription.Value);
                 SubscriptionNode node = LookupNode(subscription.Key);
                 if (node.subscribers == null) node.subscribers = new Dictionary<IMqttSession, QoS>();
                 node.subscribers[session] = subscription.Value;                 

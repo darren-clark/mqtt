@@ -157,6 +157,7 @@ namespace DClark.MQTT.Messages
         protected String ReadString()
         {
             short length = ReadInt16();
+            if (length == 0) return "";
             remainingSize -= (length);
             byte[] buffer = new byte[length];
             stream.Read(buffer, 0, length);

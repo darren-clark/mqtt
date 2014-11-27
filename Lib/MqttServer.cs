@@ -112,7 +112,7 @@ namespace DClark.MQTT
         private async void handleConnection(TcpClient connection)
         {
             var ep = connection.Client.RemoteEndPoint;
-            Console.WriteLine("New Conection from {0}", ep);
+            Console.WriteLine("New Connection from {0}", ep);
             NetworkStream stream = connection.GetStream();
             MqttMessage message = await MqttMessage.Read(stream, 5);
             if (message.Type != MessageType.Connect) throw new MqttProtocolException("First packet not connect");
@@ -122,7 +122,7 @@ namespace DClark.MQTT
             ConnectMessage connectMessage = (ConnectMessage) message;
             double keepalive = ((ConnectMessage)message).KeepAlive*1.5;
             String clientId = ((ConnectMessage)message).ClientId;
-            //Console.WriteLine("Client {0} connected", clientId);
+            if (String.IsNullOrEmpty(clientId)) clientId = Guid.NewGuid().ToString();
             IMqttSession session = await sessionProvider.NewSession(clientId);
             Console.WriteLine("Client {0} connected from {1} ({2},{3})", clientId, ep,connectMessage.CleanSession,connectMessage.KeepAlive);
             connections.Add(session, connection);
@@ -137,7 +137,6 @@ namespace DClark.MQTT
                         try
                         {
                             message = incoming.Result;
-                            //Console.WriteLine("Received {0} from {1}", message,clientId);
                         }
                         catch (AggregateException e)
                         {
@@ -156,7 +155,6 @@ namespace DClark.MQTT
                         switch (message.Type)
                         {
                             case MessageType.Publish:
-                                Console.WriteLine("Publish received from {0} ({1})", clientId, message);
                                 await PublishReceived(session, stream, (PublishMessage)message);
                                 break;
                             case MessageType.Disconnect:
@@ -198,13 +196,11 @@ namespace DClark.MQTT
                     else
                     {
                         PendingMessage pendingMessage = outgoing.Result;
-                        //Console.WriteLine("Sending {0} to {1}", pendingMessage, clientId);
                         PendingPublishMessage pendingPublish = pendingMessage as PendingPublishMessage;
                         if (pendingPublish != null)
                         {
                             var messageInfo = await storageProvider.GetMessage(pendingPublish.MessageId);
                             message = new PublishMessage(pendingPublish.Duplicate, false, pendingPublish.QoS, messageInfo.Topic, messageInfo.Payload, pendingPublish.PacketId);
-                            //Console.WriteLine("Sending publish message {0} on {1} to {2} with QoS {3}", Encoding.UTF8.GetString(messageInfo.Payload), messageInfo.Topic, clientId, pendingPublish.QoS);
                         }
                         else
                         {
@@ -234,7 +230,6 @@ namespace DClark.MQTT
         internal async Task PublishReceived(IMqttSession session, Stream stream, PublishMessage publishMessage)
         {
             await publishMessage.ReadPayloadAsync();
-            //Console.WriteLine("{0} published {1} to {2} with QoS {3}", session.ClientId, Encoding.UTF8.GetString(publishMessage.Payload), publishMessage.Topic, publishMessage.QoS);
             //If we've already received the QoS 2 message and forwarded it, then just send the PubRec
             if (publishMessage.QoS == QoS.AtMostOnce && await session.HasQoS2(publishMessage.PacketId.Value))
             {
@@ -255,7 +250,6 @@ namespace DClark.MQTT
                 default:
                     break;
             }
-            //Console.WriteLine("Received " + Encoding.UTF8.GetString(publishMessage.Payload) + " on topic " + publishMessage.Topic);
         }
 
         private async Task PublishMessages(IMqttSession session, Stream stream, IEnumerable<Tuple<string, QoS, byte[]>> messages, bool retained)
@@ -298,7 +292,6 @@ namespace DClark.MQTT
                     {
                         await storageProvider.ReferenceMessage(messageId);
                     }
-                    //Console.WriteLine("Publishing {0} on {1} to {2} with QoS {3}", Encoding.UTF8.GetString(payload), topic, subscription.Item1.ClientId, subscription.Item2);
                     subscription.Item1.Publish(messageId, subscription.Item2);
                 }
                 else

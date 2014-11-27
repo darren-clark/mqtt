@@ -58,8 +58,6 @@ namespace DClark.MQTT.SimpleProvider
         private PendingMessage lastMessage;
         private T DequeueMessage<T>(short packetId) where T : PendingMessage 
         {
-            if (lastMessage is T && lastMessage.PacketId == packetId) return null;
-
             lastMessage = pendingMessages.Dequeue();
             Debug.Assert(lastMessage is T && lastMessage.PacketId == packetId);
             //Signal we still have messages if someone is waiting.
@@ -68,7 +66,7 @@ namespace DClark.MQTT.SimpleProvider
                 TaskCompletionSource<PendingMessage> source = pendingMessageCompletionSource;
                 pendingMessageCompletionSource = null;
                 source.SetResult(pendingMessages.Peek());
-            }
+            }   
             return (T)lastMessage;
         }
 
@@ -106,7 +104,6 @@ namespace DClark.MQTT.SimpleProvider
         {
             if (pendingMessages.Count > 0 && pendingMessages.Peek() != lastMessage)
             {
-                //Console.WriteLine("New message pending: {0}", pendingMessages.Peek());
                 return pendingMessages.Peek();
             }
             else
@@ -118,14 +115,14 @@ namespace DClark.MQTT.SimpleProvider
                 TaskCompletionSource<PendingMessage> currentCompletion = pendingMessageCompletionSource;
                 if (pendingMessages.Count == 0)
                 {
-                    //Console.WriteLine("No pending messages.");
                     return await pendingMessageCompletionSource.Task;
                 }
                 else
                 {
-                    //Console.WriteLine("Duplicate message to send. Waiting.");
                     Task delayTask = Task.Delay(timeoutMilliseconds);
-                    if (await Task.WhenAny(delayTask, pendingMessageCompletionSource.Task) == delayTask)
+                    Task<PendingMessage> nextTask = pendingMessageCompletionSource.Task;
+                    Task result = await Task.WhenAny(delayTask, nextTask);
+                    if (result == delayTask)
                     {
                         if (pendingMessages.Count > 0 && pendingMessages.Peek() == lastMessage)
                         {
@@ -133,7 +130,7 @@ namespace DClark.MQTT.SimpleProvider
                             return lastMessage;
                         }
                     }
-                    return await pendingMessageCompletionSource.Task;
+                    return await nextTask;
                 }
             }
         }
@@ -142,13 +139,18 @@ namespace DClark.MQTT.SimpleProvider
         void IMqttSession.Publish(string messageId, QoS qos)
         {
             var publish = new PendingPublishMessage(1, messageId, qos);
-            if (pendingMessages.Count == 0 && pendingMessageCompletionSource != null)
+            //WARNING: Something you may not expect
+            //SetResult will transfer control to a waiter if there is one. We need to get our queue straight before that happens
+            //Or else whack shit goes wrong. So don't go thinking "it's prettier to see if the queue is empty before queueing".
+            //Not that this was ever coded that way or anything...
+            pendingMessages.Enqueue(publish);
+            //If this is the first message, signal.
+            if (pendingMessages.Count == 1 && pendingMessageCompletionSource != null)
             {
                 TaskCompletionSource<PendingMessage> source = pendingMessageCompletionSource;
                 pendingMessageCompletionSource = null;
                 source.SetResult(publish);
             }
-            pendingMessages.Enqueue(publish);
             if (qos == QoS.AtMostOnce)
             {
                 pendingMessages.Enqueue(new PendingPubRelMessage(1));
